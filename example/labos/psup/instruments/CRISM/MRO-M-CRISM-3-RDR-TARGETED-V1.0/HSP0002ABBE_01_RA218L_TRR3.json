@@ -1,0 +1,165 @@
+{
+    "type": "Feature",
+    "stac_version": "1.0.0",
+    "id": "HSP0002ABBE_01_RA218L_TRR3",
+    "stac_extensions": [
+        "https://stac-extensions.github.io/projection/v1.0.0/schema.json",
+        "https://raw.githubusercontent.com/thareUSGS/ssys/main/json-schema/schema.json"
+    ],
+    "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [
+                    148.3194,
+                    24.3207
+                ],
+                [
+                    148.1227,
+                    24.2991
+                ],
+                [
+                    147.8025,
+                    26.6813
+                ],
+                [
+                    147.4763,
+                    29.0618
+                ],
+                [
+                    147.1431,
+                    31.4406
+                ],
+                [
+                    146.8025,
+                    33.814
+                ],
+                [
+                    147.0315,
+                    33.8368
+                ],
+                [
+                    147.3634,
+                    31.4594
+                ],
+                [
+                    147.688,
+                    29.0803
+                ],
+                [
+                    148.0067,
+                    26.6996
+                ],
+                [
+                    148.3194,
+                    24.3207
+                ]
+            ]
+        ]
+    },
+    "bbox": [
+        [
+            146.8025,
+            24.2991,
+            148.3194,
+            33.8368
+        ]
+    ],
+    "properties": {
+        "gid": "511725",
+        "latitude": 29.069100,
+        "longitude": 147.602400,
+        "maximum_latitude": 33.836800,
+        "minimum_latitude": 24.299100,
+        "max_longitude": 148.319400,
+        "min_longitude": 146.802500,
+        "emission_angle": 0.240167,
+        "incidence_angle": 42.519295,
+        "phase_angle": 42.307888,
+        "solar_longitude": 4.194775,
+        "north_pole_state": "F",
+        "south_pole_state": "F",
+        "target_name": "MARS",
+        "product_id": "HSP0002ABBE_01_RA218L_TRR3",
+        "dataset_id": "MRO-M-CRISM-3-RDR-TARGETED-V1.0",
+        "spacecraft_id": "MRO",
+        "instrument_id": "CRISM",
+        "start_datetime": "2013-08-09T00:38:38.645000",
+        "end_datetime": "2013-08-09T00:41:38.575001",
+        "PDS_volume_ID": "MROCR_2108",
+        "product_type": "TRDR",
+        "created": "2013-08-17T08:06:05",
+        "shpsource": "Corresponding DDR Footprint",
+        "ODE_ID": "21552733",
+        "mission": "Mars Reconnaissance Orbiter",
+        "platform": "Mars Reconnaissance Orbiter",
+        "instruments": [
+            "Compact Reconnaissance Imaging Spectrometer for Mars"
+        ],
+        "wavelength": "IR",
+        "class_observation": "Hyperspectral Survey, losslessly compressed",
+        "observation_id": "0002ABBE",
+        "observation_counter": "01",
+        "observation_type": "Radiance",
+        "macro": "218",
+        "proj:epsg": null,
+        "proj:wkt2": "GEOGCS[\"Mars 2000\",DATUM[\"D_Mars_2000\",SPHEROID[\"Mars_2000_IAU_IAG\",3396190.0,169.89444722361179]],PRIMEM[\"Greenwich\",0],UNIT[\"Decimal_Degree\",0.0174532925199433]]",
+        "ssys:targets": [
+            "Mars"
+        ],
+        "datetime": "2013-08-09T00:38:38.645000"
+    },
+    "links": [
+        {
+            "href": "../../../../../catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "HSP0002ABBE_01_RA218L_TRR3.json",
+            "rel": "self",
+            "type": "application/geo+json",
+            "title": "HSP0002ABBE_01_RA218L_TRR3"
+        },
+        {
+            "href": "../MRO-M-CRISM-3-RDR-TARGETED-V1.0.json",
+            "rel": "parent",
+            "type": "application/json",
+            "title": "MRO-M-CRISM-3-RDR-TARGETED-V1.0"
+        }
+    ],
+    "assets": {
+        "URL to ODE's product page": {
+            "href": "https://ode.rsl.wustl.edu/mars/indexproductpage.aspx?product_id=HSP0002ABBE_01_RA218L_TRR3&product_idGeo=21552733",
+            "description": "URL to ODE's product page",
+            "type": "text/plain",
+            "roles": [
+                "metadata"
+            ]
+        },
+        "URL to ODE's product file list": {
+            "href": "https://ode.rsl.wustl.edu/mars/productfiles.aspx?product_id=HSP0002ABBE_01_RA218L_TRR3&product_idGeo=21552733",
+            "description": "URL to ODE's product file list",
+            "type": "text/plain",
+            "roles": [
+                "metadata"
+            ]
+        },
+        "service": {
+            "href": "https://ode.rsl.wustl.edu//mars//map/productfootprint.aspx?product_idgeo=21552733",
+            "description": "Map context",
+            "type": "text/html",
+            "roles": [
+                "service"
+            ]
+        },
+        "URL to the product's label": {
+            "href": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-3-rdr-targeted-v1/mrocr_2108/trdr/2013/2013_221/hsp0002abbe/hsp0002abbe_01_ra218l_trr3.lbl",
+            "description": "URL to the product's label",
+            "roles": [
+                "data"
+            ]
+        }
+    },
+    "collection": "MRO-M-CRISM-3-RDR-TARGETED-V1.0"
+}

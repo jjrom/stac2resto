@@ -1,0 +1,43 @@
+{
+    "type": "Catalog",
+    "stac_version": "1.0.0",
+    "id": "psup",
+    "description": "This catalog contains the 'Planetary Surface Portal' (PSuP) hosted planetary data.\nPSuP is a data processing center coupled with a data dissemination center for planetary surfaces. The PSuP portal is an initiative of OSUPS and OSUL. PSuP provides : \n- Service platforms for processing and visualizing planetary surface data.\n- Products derived from local and global maps (mineralogical information, geomorphological information, DTM, ...).\n- Mining tools, 2D/3D visualization (MarsVisu), DTM processing (MarsSI).\n- Query/data transfer tools.\nNational Observation Service (SNO) labelled. This catalog is organized by french scientific laboratory. Within each sub-catalog, users will find data organized by solar body.",
+    "links": [
+        {
+            "href": "../catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "psup.json",
+            "rel": "self",
+            "type": "application/json",
+            "title": "PSuP, Planetary Surface Portal"
+        },
+        {
+            "href": "../pdsp.json",
+            "rel": "parent",
+            "type": "application/json",
+            "title": "P\u00f4le de donn\u00e9es et services Surfaces Plan\u00e9taires"
+        },
+        {
+            "href": "http://psup.ias.u-psud.fr/sitools/client-user/index.html?project=PLISonMars",
+            "rel": "about",
+            "title": "Planetary Surface Portal"
+        },
+        {
+            "href": "./psup/ias.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "Institut d'Astrophysique Spatiale"
+        },
+        {
+            "href": "./psup/marssi.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "MARS Syst\u00e8me d\u2019Information"
+        }
+    ],
+    "title": "PSuP, Planetary Surface Portal"
+}

@@ -1,0 +1,44 @@
+{
+    "type": "Catalog",
+    "stac_version": "1.0.0",
+    "id": "pdsp",
+    "description": "This catalog contains the 'P\u00f4le de donn\u00e9es et services Surfaces Plan\u00e9taires' (PDSP) hosted planetary data. This catalog is organized by french scientific laboratory. Within each sub-catalog, users will find data organized by solar body.",
+    "links": [
+        {
+            "href": "./catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "catalog.json",
+            "rel": "self",
+            "type": "application/json",
+            "title": "P\u00f4le de donn\u00e9es et services Surfaces Plan\u00e9taires"
+        },
+        {
+            "href": "https://pole-surfaces-planetaires.github.io/",
+            "rel": "about",
+            "type": "text/html",
+            "title": "P\u00f4le de donn\u00e9es et services Surfaces Plan\u00e9taires"
+        },
+        {
+            "href": "https://pole-surfaces-planetaires.github.io/_static/logo_pole_surfaces_planetaires.jpg",
+            "rel": "alternate",
+            "type": "image/png",
+            "title": "PDSP's Logo"
+        },
+        {
+            "href": "./labos/psup.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "PSuP, Planetary Surface Portal"
+        },
+        {
+            "href": "./rois/roi.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "A special ODE field that indicates whether this footprint overlaps specific targets (Example: Spirit Rover)"
+        }
+    ],
+    "title": "P\u00f4le de donn\u00e9es et services Surfaces Plan\u00e9taires"
+}

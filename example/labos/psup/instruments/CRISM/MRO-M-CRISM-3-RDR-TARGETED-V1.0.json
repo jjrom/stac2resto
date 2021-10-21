@@ -1,0 +1,94 @@
+{
+    "id": "MRO-M-CRISM-3-RDR-TARGETED-V1.0",
+    "type": "Collection",
+    "stac_version": "1.0.0",
+    "description": "A Targeted Reduced Data Record (TRDR) is a radiometrically calibrated CRISM spectral image cube derived from raw Experiment Data Record (EDR) products, i.e. from a single observation. TRDRs have been resampled in the spectral or spatial direction. If resampling has been performed, that is indicated in the label and file name. TRDRs contain one or more multiple-band images that have been converted from EDRs to units of spectral radiance or I/F.\nSpectral radiance is defined as: W / (m2 micrometer steradians)\nI/F is defined as the spectral radiance divided by the spectral radiance of the Sun at Mars distance at the time of observation. Another way to put it is that it is the ratio of the radiance observed from a surface to that of a perfect white Lambertian surface illuminated by the same light source but at normal incidence.\nI is defined as: power / area / I / steradians\nF is defined as: (solar irradiance at Mars) / pi\nwhere the (solar irradiance at Mars) is the solar spectral irradiance as seen by a normally illuminated surface 1 AU from the sun adjusted for the distance of Mars from the sun for that particular observation.",
+    "license": "GFDL-1.1-only",
+    "extent": {
+        "spatial": {
+            "bbox": [
+                [
+                    -180.0,
+                    -89.5941,
+                    180.0,
+                    90.0
+                ]
+            ]
+        },
+        "temporal": {
+            "interval": [
+                [
+                    "2006-09-27 21:52:44.417999",
+                    "2016-08-08 23:58:44.140999"
+                ]
+            ]
+        }
+    },
+    "title": "MRO-M-CRISM-3-RDR-TARGETED-V1.0",
+    "providers": [
+        {
+            "name": "MarsSI",
+            "description": "MARS Syst\u00e8me d\u2019Information",
+            "roles": [
+                "host"
+            ],
+            "url": "https://marssi.univ-lyon1.fr/MarsSI/"
+        }
+    ],
+    "summaries": {
+        "wavelength": [
+            "IR",
+            "VNIR"
+        ],
+        "dataset_id": "MRO-M-CRISM-3-RDR-TARGETED-V1.0",
+        "instruments": [
+            "Compact Reconnaissance Imaging Spectrometer for Mars"
+        ],
+        "platform": "Mars Reconnaissance Orbiter",
+        "mission": "Mars Reconnaissance Orbiter",
+        "count": 164046
+    },
+    "links": [
+        {
+            "href": "../../../../catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "MRO-M-CRISM-3-RDR-TARGETED-V1.0.json",
+            "rel": "self",
+            "type": "application/json",
+            "title": "MRO-M-CRISM-3-RDR-TARGETED-V1.0"
+        },
+        {
+            "href": "../CRISM.json",
+            "rel": "parent",
+            "type": "application/json",
+            "title": "Compact Reconnaissance Imaging Spectrometer for Mars"
+        },
+        {
+            "href": "./MRO-M-CRISM-3-RDR-TARGETED-V1.0/HSP0002ABBE_01_IF218L_TRR3.json",
+            "rel": "item",
+            "type": "application/geo+json",
+            "title": "HSP0002ABBE_01_IF218L_TRR3"
+        },
+        {
+            "href": "./MRO-M-CRISM-3-RDR-TARGETED-V1.0/HSP0002ABBE_01_IF218S_TRR3.json",
+            "rel": "item",
+            "type": "application/geo+json",
+            "title": "HSP0002ABBE_01_IF218S_TRR3"
+        },
+        {
+            "href": "./MRO-M-CRISM-3-RDR-TARGETED-V1.0/HSP0002ABBE_01_RA218L_TRR3.json",
+            "rel": "item",
+            "type": "application/geo+json",
+            "title": "HSP0002ABBE_01_RA218L_TRR3"
+        },
+        {
+            "href": "./MRO-M-CRISM-3-RDR-TARGETED-V1.0/HSP0002ABBE_01_RA218S_TRR3.json",
+            "rel": "item",
+            "type": "application/geo+json",
+            "title": "HSP0002ABBE_01_RA218S_TRR3"
+        }
+    ]
+}

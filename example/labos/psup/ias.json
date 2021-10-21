@@ -1,0 +1,31 @@
+{
+    "type": "Catalog",
+    "stac_version": "1.0.0",
+    "id": "ias",
+    "description": "This catalog contains the IAS hosted planetary data.",
+    "links": [
+        {
+            "href": "../../catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "ias.json",
+            "rel": "self",
+            "type": "application/json",
+            "title": "Institut d'Astrophysique Spatiale"
+        },
+        {
+            "href": "../psup.json",
+            "rel": "parent",
+            "type": "application/json",
+            "title": "PSuP, Planetary Surface Portal"
+        },
+        {
+            "href": "https://www.ias.u-psud.fr",
+            "rel": "about",
+            "title": "IAS web site"
+        }
+    ],
+    "title": "Institut d'Astrophysique Spatiale"
+}

@@ -1,0 +1,71 @@
+{
+    "type": "Catalog",
+    "stac_version": "1.0.0",
+    "id": "marssi",
+    "description": "This catalog contains the MarsSI hosted planetary data. MarsSI (Acronym of \"MARS Information System\") is a Geographic Information System application that allows to manage and process Mars orbital data.",
+    "links": [
+        {
+            "href": "../../catalog.json",
+            "rel": "root",
+            "type": "application/json"
+        },
+        {
+            "href": "marssi.json",
+            "rel": "self",
+            "type": "application/json",
+            "title": "MARS Syst\u00e8me d\u2019Information"
+        },
+        {
+            "href": "../psup.json",
+            "rel": "parent",
+            "type": "application/json",
+            "title": "PSuP, Planetary Surface Portal"
+        },
+        {
+            "href": "https://marssi.univ-lyon1.fr/MarsSI/",
+            "rel": "about",
+            "title": "MarsSI web site"
+        },
+        {
+            "href": "https://marssi.univ-lyon1.fr/wiki/Home",
+            "rel": "about",
+            "title": "MarsSI wiki"
+        },
+        {
+            "href": "https://marssi.univ-lyon1.fr/wiki/Citing",
+            "rel": "license",
+            "title": "Citing MarsSI"
+        },
+        {
+            "href": "./instruments/CRISM.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "Compact Reconnaissance Imaging Spectrometer for Mars"
+        },
+        {
+            "href": "./instruments/CTX.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "Context Camera"
+        },
+        {
+            "href": "./instruments/HIRISE.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "High-Resolution Imaging Science Experiment"
+        },
+        {
+            "href": "./instruments/HRSC.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "High Resolution Stereo Camera"
+        },
+        {
+            "href": "./instruments/THEMIS.json",
+            "rel": "child",
+            "type": "application/json",
+            "title": "Thermal Emission Imaging System"
+        }
+    ],
+    "title": "MARS Syst\u00e8me d\u2019Information"
+}
