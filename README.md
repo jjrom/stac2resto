@@ -7,4 +7,4 @@ Ingest a STAC tree into resto database
 
 ## Run application
 
-    docker run -v /Users/jrom/Devel/stac2resto/example:/data -it --rm --name="stac2resto" jjrom/stac2resto:latest /data/catalog.json http://localhost:5252
+    docker run -v /Users/jrom/Devel/stac2resto/example:/data -it --rm --name="stac2resto" jjrom/stac2resto:latest /data/catalog.json http://host.docker.internal:5252

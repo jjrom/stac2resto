@@ -109,8 +109,10 @@ def process_stuff(url):
         child_url = get_absolute_url(url, link["href"])
 
         if link["rel"] in ["child", "item", "items"]:
+
             if link["rel"] == "child":
                 logger.debug("Process %s" % child_url)
+
             process_stuff(child_url)   
 
 #
@@ -129,11 +131,7 @@ def get_absolute_url(rootUrl, url):
 # Read remote json @ url
 #
 def read_remote_json(url):
-    headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'dea-access-resto-ingester/v1'
-        }
+
     try:
         stuff = session.get(url, timeout = DEFAULT_TIMEOUT, headers=headers, verify=SSL_VERIFY).json()
     except:
@@ -146,18 +144,10 @@ def read_remote_json(url):
 # Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items/0f29a83f-9808-4f39-a822-1accc6085e61
 #
 def post_collection(collection):
-    logger.info("  POST Collection %s to %s" % (collection["id"], RESTO_URL + '/collections'))
-    return
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'dea-access-resto-ingester/v1'
-    }
-    collection_id = re.search(r".*/collections/(.*)/items/.*", url).group(1)
-    feature_id = re.search(r".*/items/(.*)$", url).group(1)
-    feature = session.get(url, timeout = DEFAULT_TIMEOUT, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD)).json()
-    resp = session.post("%s/collections/%s/items" % (RESTO_URL, collection_id), json=feature, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD))
 
+    logger.info("  POST Collection %s to %s" % (collection["id"], RESTO_URL + '/collections'))
+    #resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    resp = requests.post("%s/collections" % (RESTO_URL), data=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
     logger.debug(resp.json())
 
 
@@ -264,20 +254,6 @@ def post_features(url, max_features=20):
 
 # ############ end functions ##############################################
 
-# Color logging
-LOG_LEVEL = logging.DEBUG
-LOGFORMAT = "%(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
-#LOGFORMAT = "[%(log_color)s%(levelname)s%(reset)s] %(log_color)s%(message)s%(reset)s"
-#LOGFORMAT = "%(asctime)s - %(name)s - [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
-logging.root.setLevel(LOG_LEVEL)
-formatter = ColoredFormatter(LOGFORMAT)
-stream = logging.StreamHandler()
-stream.setLevel(LOG_LEVEL)
-stream.setFormatter(formatter)
-logger = logging.getLogger('stac2resto')
-logger.setLevel(LOG_LEVEL)
-logger.addHandler(stream)
-
 # CTRL-C handler
 signal.signal(signal.SIGINT, kill_handler)
 
@@ -294,10 +270,24 @@ RESTO_URL = sys.argv[2]
 RESTO_ADMIN_AUTH_TOKEN = os.environ.get("RESTO_ADMIN_AUTH_TOKEN")
 
 DEFAULT_TIMEOUT = 45 # seconds
-DEVEL           =  False
+DEVEL           = os.getenv('DEVEL', 'False').lower() in ('true', '1', 't')
 SSL_VERIFY      = True
 
 env             = Env()
+
+# Color logging
+LOG_LEVEL = logging.DEBUG if DEVEL == True else logging.INFO 
+LOGFORMAT = "%(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
+#LOGFORMAT = "[%(log_color)s%(levelname)s%(reset)s] %(log_color)s%(message)s%(reset)s"
+#LOGFORMAT = "%(asctime)s - %(name)s - [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
+logging.root.setLevel(LOG_LEVEL)
+formatter = ColoredFormatter(LOGFORMAT)
+stream = logging.StreamHandler()
+stream.setLevel(LOG_LEVEL)
+stream.setFormatter(formatter)
+logger = logging.getLogger('stac2resto')
+logger.setLevel(LOG_LEVEL)
+logger.addHandler(stream)
 
 if STAC_URL is None:
     logger.error("Missing mandatory input STAC_URL")
@@ -324,6 +314,13 @@ RETRY_STRATEGY = Retry(
     status_forcelist=[ 429, 500, 502, 503, 504 ], # Retry on these error codes. Might have to add more in future. depends on explorer API errors.
     method_whitelist=[ "HEAD", "GET", "POST" ]
 )
+
+RESTO_HEADERS = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'User-Agent': 'stac2resto',
+    'Authorization': 'Bearer ' + RESTO_ADMIN_AUTH_TOKEN
+}
 
 # post items to resto according to item type: item, items, collection, etc.
 logger.debug("Input STAC endpoint is %s " % (STAC_URL))
