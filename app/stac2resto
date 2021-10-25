@@ -10,14 +10,14 @@ import sys
 import json
 import re
 import requests
-import configparser
 import urllib3
 import time
-import os 
-import subprocess
+import os
 import validators
 import signal
 import logging
+import argparse
+import textwrap
 
 from colorlog import ColoredFormatter
 
@@ -29,23 +29,30 @@ from urllib3.util import Retry
 from tqdm import tqdm
 
 # ########### Usage ##########################################################
-def usage():
-    print(""" 
-    Takes an input STAC catalog root url and ingest items recursively into target resto endpoint
+USAGE = """stac2resto - Takes an input STAC catalog root url and ingest items recursively into target resto endpoint
 
-    Usage: 
-    
-        ./stac2resto.py <stac_url> <resto_url>
+    Usage:
+
+        stac2resto STAC_URL [options]
 
     Where:
-
-        [MANDATORY] stac_url is either:
+    
+        STAC_URL is either:
+        
             * a local catalog endpoint (e.g. /data/catalog.json)
             * a remote catalog endpoint (e.g. https://tamn.snapplanet.io)
 
-        [MANDATORY] resto_url is a resto root endpoint (e.g. http://localhost:5252)
+        
+    Optional arguments:
 
-    """)
+        --RESTO_URL         resto endpoint. Default is "http://host.docker.internal:5252"
+        --DEVEL             Set DEVEL mode on (i.e. deactivate ssl and be verbose)
+              
+"""
+
+def usage():
+    print(textwrap.dedent(USAGE))
+    exit(1)
 
 def kill_handler(signum, frame):
     global KILL_ME
@@ -53,6 +60,18 @@ def kill_handler(signum, frame):
     sys.exit(1)
 
 # ############ helper classes/functions ####################################
+
+def args_options():
+
+    # Parser
+    parser = argparse.ArgumentParser(prog='stac2resto', formatter_class=argparse.RawDescriptionHelpFormatter, description=textwrap.dedent(USAGE))
+
+    # Process options
+    parser.add_argument('STAC_URL', help="STAC endpoint. This could be either a local catalog endpoint (e.g./data/catalog.json) or a remote catalog endpoint (e.g. https://tamn.snapplanet.io)")
+    parser.add_argument('--RESTO_URL', help='resto endpoint. Default is "http://host.docker.internal:5252"')
+    parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
+    
+    return parser
 
 #
 # Process catalog url/path
@@ -265,26 +284,36 @@ def post_features(url, max_features=20):
 
 # ############ end functions ##############################################
 
+# To kill the process on CTRL-C even in the loop
+KILL_ME = False
+DEFAULT_TIMEOUT = 45 # seconds
+SSL_VERIFY      = True
+
 # CTRL-C handler
 signal.signal(signal.SIGINT, kill_handler)
 
-# simple command line management:
-if len(sys.argv) < 3 or len(sys.argv) > 4:
+parser = args_options()
+args = parser.parse_args()
+
+#### Get arguments
+if not args:
     usage()
-    exit(1)
 
-# To kill the process on CTRL-C even in the loop
-KILL_ME = False
+# Get properties for identifierOrPolygon from snapplanet
+if 'STAC_URL' in args and args.STAC_URL:
+    STAC_URL = args.STAC_URL  
+else:
+    usage()
 
-STAC_URL  = sys.argv[1] 
-RESTO_URL = sys.argv[2]
-RESTO_ADMIN_AUTH_TOKEN = os.environ.get("RESTO_ADMIN_AUTH_TOKEN")
+# resto endpoint
+RESTO_URL = os.environ.get('RESTO_URL') if os.environ.get('RESTO_URL') else 'http://host.docker.internal:5252'
+if args and 'RESTO_URL' in args and args.RESTO_URL:
+    RESTO_URL = args.RESTO_URL
 
-DEFAULT_TIMEOUT = 45 # seconds
-DEVEL           = os.getenv('DEVEL', 'False').lower() in ('true', '1', 't')
-SSL_VERIFY      = True
-
-env             = Env()
+# Devel
+DEVEL = os.getenv('DEVEL', 'False').lower() in ('true', '1', 't')
+if args and 'DEVEL' in args and args.DEVEL:
+    DEVEL = True
 
 # Color logging
 LOG_LEVEL = logging.DEBUG if DEVEL == True else logging.INFO 
@@ -300,16 +329,17 @@ logger = logging.getLogger('stac2resto')
 logger.setLevel(LOG_LEVEL)
 logger.addHandler(stream)
 
-if STAC_URL is None:
-    logger.error("Missing mandatory input STAC_URL")
+# Snapplanet_auth_token is mandatory
+RESTO_ADMIN_AUTH_TOKEN = os.environ.get("RESTO_ADMIN_AUTH_TOKEN")
+if args and 'authToken' in args and args.authToken:
+    RESTO_ADMIN_AUTH_TOKEN = args.authToken
+
+if RESTO_ADMIN_AUTH_TOKEN is None:
+    logger.error("Missing mandatory environement variable RESTO_ADMIN_AUTH_TOKEN")
     usage()
 
 if RESTO_URL is None:
     logger.error("Missing mandatory target RESTO_URL")
-    usage()
-
-if RESTO_ADMIN_AUTH_TOKEN is None:
-    logger.error("Missing mandatory environement variable RESTO_ADMIN_AUTH_TOKEN")
     usage()
 
 if DEVEL:

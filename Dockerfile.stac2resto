@@ -13,7 +13,7 @@ FROM python:3.6.10-alpine3.11
 
 ENV DEFAULT_TIMEOUT=25 \
     # Set to run in local mode
-    DEVEL=true \
+    DEVEL=false \
     # resto auth token for id=100
     RESTO_ADMIN_AUTH_TOKEN=eyJzdWIiOiIxMDAiLCJpYXQiOjE2MzQ5MTg3NDYsImV4cCI6MjQ5ODkxODc0Nn0.jOYxKv5FFK4VD3N9PN5ZSIqAHSwz1gAkC3o-LrDGHiM \
     # Set ssl verify option for requests module
@@ -46,10 +46,10 @@ RUN apk add --verbose --progress --no-cache \
   && pip3 install environs requests tqdm configparser urllib3 colorlog validators
 
 
-ADD ./app/stac2resto.py /app
+ADD ./app/stac2resto /app
 
 RUN chown -Rv ingestor: /app
 
 USER ingestor
 
-ENTRYPOINT [ "python", "/app/stac2resto.py" ]
+ENTRYPOINT [ "python", "/app/stac2resto" ]
