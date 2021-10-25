@@ -111,7 +111,9 @@ def process_stuff(url):
         if link["rel"] in ["child", "item", "items"]:
 
             if link["rel"] == "child":
+                logger.debug("------------------------------------------------------------------------------------")
                 logger.debug("Process %s" % child_url)
+                logger.debug("------------------------------------------------------------------------------------")
 
             process_stuff(child_url)   
 
@@ -133,7 +135,7 @@ def get_absolute_url(rootUrl, url):
 def read_remote_json(url):
 
     try:
-        stuff = session.get(url, timeout = DEFAULT_TIMEOUT, headers=headers, verify=SSL_VERIFY).json()
+        stuff = session.get(url, timeout = DEFAULT_TIMEOUT, headers=RESTO_HEADERS, verify=SSL_VERIFY).json()
     except:
         stuff = None
     return stuff
@@ -146,9 +148,18 @@ def read_remote_json(url):
 def post_collection(collection):
 
     logger.info("  POST Collection %s to %s" % (collection["id"], RESTO_URL + '/collections'))
-    #resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
-    resp = requests.post("%s/collections" % (RESTO_URL), data=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
-    logger.debug(resp.json())
+    resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+
+    # HTTP 409 => collection exists. Retry with PUT to update
+    if resp.status_code == 409:
+        logger.warning("  Collection %s already exists. Send PUT request to %s" % (collection["id"], RESTO_URL + '/collections/' + collection["id"]))
+        resp = session.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+
+    # HTTP !== 200 => error
+    if resp.status_code != 200:
+        logger.error("  " + str(resp.json()))
+
+    return resp.json()
 
 
 #
@@ -332,5 +343,7 @@ adapter = HTTPAdapter(max_retries=RETRY_STRATEGY)
 session.mount(RESTO_URL.split('://')[0] + '://', adapter)
 
 # Iterative process
+logger.debug("------------------------------------------------------------------------------------")
 logger.debug("Process %s" % STAC_URL)
+logger.debug("------------------------------------------------------------------------------------")
 process_stuff(STAC_URL)

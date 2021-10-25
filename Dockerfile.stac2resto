@@ -14,8 +14,8 @@ FROM python:3.6.10-alpine3.11
 ENV DEFAULT_TIMEOUT=25 \
     # Set to run in local mode
     DEVEL=true \
-    # resto auth token
-    RESTO_ADMIN_AUTH_TOKEN=eyJzdWIiOiIyMTQwOTYzMDQ5MTE5NDE2NjciLCJpYXQiOjE2MzQ4MDMxMjUsImV4cCI6MjQ5ODgwMzEyNX0.83jpxXogY9qBgARD4MpcbOjuKHZnsuP0X-4ljBRva2s \
+    # resto auth token for id=100
+    RESTO_ADMIN_AUTH_TOKEN=eyJzdWIiOiIxMDAiLCJpYXQiOjE2MzQ5MTg3NDYsImV4cCI6MjQ5ODkxODc0Nn0.jOYxKv5FFK4VD3N9PN5ZSIqAHSwz1gAkC3o-LrDGHiM \
     # Set ssl verify option for requests module
     SSL_VERIFY=false \
     # Prevents Python from writing pyc files to disc
