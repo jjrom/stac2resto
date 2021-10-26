@@ -69,6 +69,7 @@ def args_options():
     # Process options
     parser.add_argument('STAC_URL', help="STAC endpoint. This could be either a local catalog endpoint (e.g./data/catalog.json) or a remote catalog endpoint (e.g. https://tamn.snapplanet.io)")
     parser.add_argument('--RESTO_URL', help='resto endpoint. Default is "http://host.docker.internal:5252"')
+    parser.add_argument('--COLLECTION_DEFAULT_MODEL', help='Default model to apply to new collection if not present in collection.json file. Default is "DefaultModel"')
     parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
     
     return parser
