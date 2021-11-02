@@ -45,8 +45,9 @@ USAGE = """stac2resto - Takes an input STAC catalog root url and ingest items re
         
     Optional arguments:
 
-        --RESTO_URL         resto endpoint. Default is "http://host.docker.internal:5252"
-        --DEVEL             Set DEVEL mode on (i.e. deactivate ssl and be verbose)
+        --RESTO_URL                 resto endpoint. Default is "http://host.docker.internal:5252"
+        --COLLECTION_DEFAULT_MODEL  Default model to apply to new collection if not present in collection.json file. Default is "DefaultModel"
+        --DEVEL                     Set DEVEL mode on (i.e. deactivate ssl and be verbose)
               
 """
 
@@ -168,6 +169,11 @@ def read_remote_json(url):
 def post_collection(collection):
 
     logger.info("  POST Collection %s to %s" % (collection["id"], RESTO_URL + '/collections'))
+    if 'model' not in collection:
+        collection["model"] = COLLECTION_DEFAULT_MODEL;
+    
+    logger.info("  Apply model %s " % (COLLECTION_DEFAULT_MODEL))
+        
     resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # HTTP 409 => collection exists. Retry with PUT to update
@@ -312,9 +318,14 @@ if args and 'RESTO_URL' in args and args.RESTO_URL:
     RESTO_URL = args.RESTO_URL
 
 # Devel
-DEVEL = os.getenv('DEVEL', 'False').lower() in ('true', '1', 't')
+DEVEL = os.environ.get('DEVEL') if os.environ.get('DEVEL') else False
 if args and 'DEVEL' in args and args.DEVEL:
     DEVEL = True
+
+# Default model to apply to collection
+COLLECTION_DEFAULT_MODEL = os.environ.get('COLLECTION_DEFAULT_MODEL') if os.environ.get('COLLECTION_DEFAULT_MODEL') else 'DefaultModel'
+if args and 'COLLECTION_DEFAULT_MODEL' in args and args.COLLECTION_DEFAULT_MODEL:
+    COLLECTION_DEFAULT_MODEL = args.COLLECTION_DEFAULT_MODEL
 
 # Color logging
 LOG_LEVEL = logging.DEBUG if DEVEL == True else logging.INFO 
