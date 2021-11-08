@@ -106,12 +106,12 @@ def process_stuff(url):
 
     # Post Feature and skip
     if stuff["type"] == "Feature":
-        post_feature(stuff)
+        post_feature(stuff, url)
         return
 
     # Post FeatureCollection and skip
     if stuff["type"] == "FeatureCollection":
-        post_features(stuff)
+        post_features(stuff, url)
         return
 
     # Collection - post collection but continue to explore links after
@@ -168,17 +168,23 @@ def read_remote_json(url):
 #
 def post_collection(collection):
 
-    logger.info("  POST Collection %s to %s" % (collection["id"], RESTO_URL + '/collections'))
     if 'model' not in collection:
-        collection["model"] = COLLECTION_DEFAULT_MODEL;
+        collection["model"] = COLLECTION_DEFAULT_MODEL
     
-    logger.info("  Apply model %s " % (COLLECTION_DEFAULT_MODEL))
-        
+    logger.info("  Found collection %s" % (collection["id"]))
+    
+    # [IMPORTANT] Discard summaries
+    collection["summaries"] = None
+    
     resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
+    # Create collection
+    if resp.status_code == 200:
+        logger.info("  Create collection %s using model %s to %s" % (collection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
+
     # HTTP 409 => collection exists. Retry with PUT to update
-    if resp.status_code == 409:
-        logger.warning("  Collection %s already exists. Send PUT request to %s" % (collection["id"], RESTO_URL + '/collections/' + collection["id"]))
+    elif resp.status_code == 409:
+        logger.info("  Update existing collection %s using model %s to %s" % (collection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
         resp = session.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # HTTP !== 200 => error
@@ -192,26 +198,52 @@ def post_collection(collection):
 # POST a single item to resto
 # Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items/0f29a83f-9808-4f39-a822-1accc6085e61
 #
-def post_feature(feature):
-    logger.info("  POST Feature %s to %s" % (feature["id"], RESTO_URL + '/collections/' + feature["collection"] + '/items'))
-    return
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'dea-access-resto-ingester/v1'
-    }
-    collection_id = re.search(r".*/collections/(.*)/items/.*", url).group(1)
-    feature_id = re.search(r".*/items/(.*)$", url).group(1)
-    feature = session.get(url, timeout = DEFAULT_TIMEOUT, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD)).json()
-    resp = session.post("%s/collections/%s/items" % (RESTO_URL, collection_id), json=feature, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD))
+def post_feature(feature, url):
 
-    logger.debug(resp.json())
+    # Get collection from url
+    collection_from_url = None
+    search_me = re.search(r".*/collections/(.*)/items/.*", url)
+    if search_me:
+        collection_from_url = search_me.group(1)
+
+    # Assign collection to feature if not set
+    if 'collection' not in feature:
+        feature["collection"] = collection_from_url
+    
+    # Collection is not defined neither in feature nor in url
+    if feature["collection"] is None:
+        logger.error("  Collection is not set - skipping")
+        return
+
+    # Check collection conformity
+    if collection_from_url and feature["collection"] != collection_from_url:
+        logger.error("  Collection from url [%s] differs from collection in feature [%s] - skipping" % (collection_from_url, feature['collection']))
+        return
+    
+    logger.info("  POST Feature %s to %s" % (feature["id"], RESTO_URL + '/collections/' + feature["collection"] + '/items'))
+   
+    resp = requests.post("%s/collections/%s/items" % (RESTO_URL, feature["collection"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+
+    # Insert feature
+    if resp.status_code == 200:
+        logger.info("  Insert feature %s into collection %s" % (feature["id"], feature["collection"]))
+
+    # HTTP 409 => feature exists. Retry with PUT to update
+    elif resp.status_code == 409:
+        logger.info("  Update existing feature %s" % (feature["id"]))
+        resp = session.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+
+    # HTTP !== 200 => error
+    if resp.status_code != 200:
+        logger.error("  " + str(resp.json()))
+
+    return resp.json()
 
 #
 # POST a FeatureCollection to resto
 # Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items
 # 
-def post_features(url, max_features=20):
+def post_features(features, url, max_features=20):
 
     logger.info("  POST Features")
     return
