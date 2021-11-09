@@ -47,6 +47,7 @@ USAGE = """stac2resto - Takes an input STAC catalog root url and ingest items re
 
         --RESTO_URL                 resto endpoint. Default is "http://host.docker.internal:5252"
         --COLLECTION_DEFAULT_MODEL  Default model to apply to new collection if not present in collection.json file. Default is "DefaultModel"
+        --INGEST_FEATURE            Ingest both feature and collection (Default is to only ingrest collection)
         --DEVEL                     Set DEVEL mode on (i.e. deactivate ssl and be verbose)
               
 """
@@ -71,6 +72,7 @@ def args_options():
     parser.add_argument('STAC_URL', help="STAC endpoint. This could be either a local catalog endpoint (e.g./data/catalog.json) or a remote catalog endpoint (e.g. https://tamn.snapplanet.io)")
     parser.add_argument('--RESTO_URL', help='resto endpoint. Default is "http://host.docker.internal:5252"')
     parser.add_argument('--COLLECTION_DEFAULT_MODEL', help='Default model to apply to new collection if not present in collection.json file. Default is "DefaultModel"')
+    parser.add_argument('--INGEST_FEATURE', action='store_true', help='Ingest both feature and collection (Default is to only ingrest collection)')
     parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
     
     return parser
@@ -106,12 +108,14 @@ def process_stuff(url):
 
     # Post Feature and skip
     if stuff["type"] == "Feature":
-        post_feature(stuff, url)
+        if INGEST_FEATURE:
+            post_feature(stuff, url)
         return
 
     # Post FeatureCollection and skip
     if stuff["type"] == "FeatureCollection":
-        post_features(stuff, url)
+        if INGEST_FEATURE:
+            post_features(stuff, url)
         return
 
     # Collection - post collection but continue to explore links after
@@ -358,6 +362,11 @@ if args and 'DEVEL' in args and args.DEVEL:
 COLLECTION_DEFAULT_MODEL = os.environ.get('COLLECTION_DEFAULT_MODEL') if os.environ.get('COLLECTION_DEFAULT_MODEL') else 'DefaultModel'
 if args and 'COLLECTION_DEFAULT_MODEL' in args and args.COLLECTION_DEFAULT_MODEL:
     COLLECTION_DEFAULT_MODEL = args.COLLECTION_DEFAULT_MODEL
+
+# Ingest feature
+INGEST_FEATURE = os.environ.get('INGEST_FEATURE') if os.environ.get('INGEST_FEATURE') else False
+if args and 'INGEST_FEATURE' in args and args.INGEST_FEATURE:
+    INGEST_FEATURE = True
 
 # Color logging
 LOG_LEVEL = logging.DEBUG if DEVEL == True else logging.INFO 

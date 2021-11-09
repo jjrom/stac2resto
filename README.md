@@ -7,4 +7,9 @@ Ingest a STAC tree into resto database
 
 ## Run application
 
-    docker run -v /Users/jrom/Devel/stac2resto/example:/data -it --rm --name="stac2resto" -e COLLECTION_DEFAULT_MODEL=MarsModel --add-host=host.docker.internal:host-gateway jjrom/stac2resto:latest /data/catalog.json
+    # Ingest/update collections
+    docker run -v /Users/jrom/Devel/stac2resto/example:/data -it --rm --name="stac2resto" -e COLLECTION_DEFAULT_MODEL=MarsPDSSPModel --add-host=host.docker.internal:host-gateway jjrom/stac2resto:latest /data/catalog.json
+
+    # Ingest/update collections AND features
+    docker run -v /Users/jrom/Devel/stac2resto/example:/data -it --rm --name="stac2resto" -e COLLECTION_DEFAULT_MODEL=MarsPDSSPModel -e INGEST_FEATURE=true --add-host=host.docker.internal:host-gateway jjrom/stac2resto:latest /data/catalog.json
+
