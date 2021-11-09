@@ -176,7 +176,7 @@ def post_collection(collection):
     # [IMPORTANT] Discard summaries
     del collection["summaries"]
 
-    resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    resp = requests.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # Create collection
     if resp.status_code == 200:
@@ -185,7 +185,7 @@ def post_collection(collection):
     # HTTP 409 => collection exists. Retry with PUT to update
     elif resp.status_code == 409:
         logger.info("  Update existing collection %s using model %s to %s" % (collection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
-        resp = session.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        resp = requests.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # HTTP !== 200 => error
     if resp.status_code != 200:
@@ -231,7 +231,7 @@ def post_feature(feature, url):
     # HTTP 409 => feature exists. Retry with PUT to update
     elif resp.status_code == 409:
         logger.info("  Update existing feature %s" % (feature["id"]))
-        resp = session.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        resp = requests.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # HTTP !== 200 => error
     if resp.status_code != 200:
