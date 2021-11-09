@@ -4,6 +4,9 @@
     "stac_version": "1.0.0",
     "description": "The Compact Reconnaissance Imaging Spectrometer for Mars (CRISM) is a Visible and Near-Infrared (VNIR) imaging spectrometer onboard Mars Reconnaissance Orbiter (MRO), in orbit since 2006. It was built and tested by the Johns Hopkins University Applied Physics Laboratory under the supervision of principal investigator Scott Murchie. The observations enable to have mineralogy information of the martian surface at a spatial resolution of ~20 to ~200 m/px.",
     "license": "GFDL-1.1-only",
+    "ssys:targets": [
+        "Mars"
+    ],
     "extent": {
         "spatial": {
             "bbox": [

@@ -4,6 +4,9 @@
     "stac_version": "1.0.0",
     "description": "A Targeted Reduced Data Record (TRDR) is a radiometrically calibrated CRISM spectral image cube derived from raw Experiment Data Record (EDR) products, i.e. from a single observation. TRDRs have been resampled in the spectral or spatial direction. If resampling has been performed, that is indicated in the label and file name. TRDRs contain one or more multiple-band images that have been converted from EDRs to units of spectral radiance or I/F.\nSpectral radiance is defined as: W / (m2 micrometer steradians)\nI/F is defined as the spectral radiance divided by the spectral radiance of the Sun at Mars distance at the time of observation. Another way to put it is that it is the ratio of the radiance observed from a surface to that of a perfect white Lambertian surface illuminated by the same light source but at normal incidence.\nI is defined as: power / area / I / steradians\nF is defined as: (solar irradiance at Mars) / pi\nwhere the (solar irradiance at Mars) is the solar spectral irradiance as seen by a normally illuminated surface 1 AU from the sun adjusted for the distance of Mars from the sun for that particular observation.",
     "license": "GFDL-1.1-only",
+    "ssys:targets": [
+        "Mars"
+    ],
     "extent": {
         "spatial": {
             "bbox": [

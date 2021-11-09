@@ -174,8 +174,8 @@ def post_collection(collection):
     logger.info("  Found collection %s" % (collection["id"]))
     
     # [IMPORTANT] Discard summaries
-    collection["summaries"] = None
-    
+    del collection["summaries"]
+
     resp = session.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # Create collection
