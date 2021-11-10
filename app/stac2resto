@@ -81,14 +81,12 @@ def args_options():
 
 
 # Store history
-def store_history(lookup_table):
+def add_to_history(line):
     global HISTORY_FILE
     if not HISTORY_FILE:
         HISTORY_FILE='/data/history.txt'
-
-    logger.info("Writing history file to %s" % HISTORY_FILE)
-    with open(HISTORY_FILE, "w") as outfile:
-        outfile.write("\n".join(lookup_table))
+    with open(HISTORY_FILE, "a") as outfile:
+        outfile.write(line + "\n")
 
 #
 # Process catalog url/path
@@ -96,7 +94,6 @@ def store_history(lookup_table):
 def process_stuff(url, lookup_table):
 
     if KILL_ME == True:
-        store_history(lookup_table)
         sys.exit(1)
 
     # Check between url and path for parsing
@@ -126,6 +123,7 @@ def process_stuff(url, lookup_table):
             res = post_feature(stuff, url, lookup_table)
             if res:
                 lookup_table.append(url)
+                add_to_history(url)
         return
 
     # Post FeatureCollection and skip
@@ -160,8 +158,6 @@ def process_stuff(url, lookup_table):
             logger.debug("------------------------------------------------------------------------------------")
             process_stuff(child_url, lookup_table)
     
-    return lookup_table
-
 #
 # Compute an absolute url
 #
@@ -491,6 +487,5 @@ session.mount(RESTO_URL.split('://')[0] + '://', adapter)
 logger.debug("------------------------------------------------------------------------------------")
 logger.debug("Process %s" % STAC_URL)
 logger.debug("------------------------------------------------------------------------------------")
-lookup_table = process_stuff(STAC_URL, LOOKUP_LIST)
-store_history(lookup_table)
+process_stuff(STAC_URL, LOOKUP_LIST)
 
