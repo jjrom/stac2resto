@@ -61,7 +61,6 @@ def usage(err = None):
 def kill_handler(signum, frame):
     global KILL_ME
     KILL_ME = True
-    sys.exit(1)
 
 # ############ helper classes/functions ####################################
 
@@ -75,16 +74,29 @@ def args_options():
     parser.add_argument('--RESTO_URL', help='resto endpoint. Default is "http://host.docker.internal:5252"')
     parser.add_argument('--COLLECTION_DEFAULT_MODEL', help='Default model to apply to new collection if not present in collection.json file (Default is "DefaultModel")')
     parser.add_argument('--INGEST_STRATEGY', help='Ingest strategy defines what is ingested i.e. "collection", "feature" or "both" (Default is "collection")')
+    parser.add_argument('--HISTORY_FILE', help='Use an history file. All feature listed in the history file will not be processed')
     parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
     
     return parser
 
+
+# Store history
+def store_history(lookup_table):
+    global HISTORY_FILE
+    if not HISTORY_FILE:
+        HISTORY_FILE='/data/history.txt'
+
+    logger.info("Writing history file to %s" % HISTORY_FILE)
+    with open(HISTORY_FILE, "w") as outfile:
+        outfile.write("\n".join(lookup_table))
+
 #
 # Process catalog url/path
 #
-def process_stuff(url):
+def process_stuff(url, lookup_table):
 
     if KILL_ME == True:
+        store_history(lookup_table)
         sys.exit(1)
 
     # Check between url and path for parsing
@@ -111,17 +123,15 @@ def process_stuff(url):
     # Post Feature and skip
     if stuff["type"] == "Feature":
         if INGEST_FEATURE:
-            post_feature(stuff, url)
-        else:
-            print(".", end = '')
+            res = post_feature(stuff, url, lookup_table)
+            if res:
+                lookup_table.append(url)
         return
 
     # Post FeatureCollection and skip
     if stuff["type"] == "FeatureCollection":
         if INGEST_FEATURE:
             post_features(stuff, url)
-        else:
-            print(".", end = '')
         return
 
     # Collection - post collection but continue to explore links after
@@ -135,18 +145,22 @@ def process_stuff(url):
         return
     
     # Recursively process links
-    for link in stuff["links"]:
+    size = len(stuff["links"])
+    logger.info("   Found %s links" % str(size))
+    for link in tqdm(stuff["links"]):
 
         # Compute the absolute child url
         child_url = get_absolute_url(url, link["href"])
 
         if link["rel"] in ["item", "items"] and INGEST_FEATURE:
-            process_stuff(child_url)
+            process_stuff(child_url, lookup_table)
         elif link["rel"] == "child":
             logger.debug("------------------------------------------------------------------------------------")
             logger.debug("Process %s" % child_url)
             logger.debug("------------------------------------------------------------------------------------")
-            process_stuff(child_url)
+            process_stuff(child_url, lookup_table)
+    
+    return lookup_table
 
 #
 # Compute an absolute url
@@ -178,24 +192,30 @@ def read_remote_json(url):
 #
 def post_collection(collection):
 
-    if 'model' not in collection:
-        collection["model"] = COLLECTION_DEFAULT_MODEL
-    
-    logger.info("  Found collection %s" % (collection["id"]))
-    
-    # [IMPORTANT] Discard summaries
-    del collection["summaries"]
+    tmpCollection = collection.copy()
 
-    resp = requests.post("%s/collections" % (RESTO_URL), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    if 'model' not in tmpCollection:
+        tmpCollection["model"] = COLLECTION_DEFAULT_MODEL
+    
+    logger.info("  Found collection %s" % (tmpCollection["id"]))
+    
+    # [IMPORTANT] Discard summaries and links
+    if "summaries" in tmpCollection:
+        del tmpCollection["summaries"]
+
+    if "links" in tmpCollection:
+        del tmpCollection["links"]
+
+    resp = requests.post("%s/collections" % (RESTO_URL), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # Create collection
     if resp.status_code == 200:
-        logger.info("  Create collection %s using model %s to %s" % (collection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
+        logger.info("  Create collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
 
     # HTTP 409 => collection exists. Retry with PUT to update
     elif resp.status_code == 409:
-        logger.info("  Update existing collection %s using model %s to %s" % (collection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
-        resp = requests.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=collection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        logger.info("  Update existing collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
+        resp = requests.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # HTTP !== 200 => error
     if resp.status_code != 200:
@@ -208,7 +228,16 @@ def post_collection(collection):
 # POST a single item to resto
 # Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items/0f29a83f-9808-4f39-a822-1accc6085e61
 #
-def post_feature(feature, url):
+def post_feature(feature, url, lookup_table):
+
+    try:
+        idx = lookup_table.index(url)
+    except ValueError:
+        idx = -1
+    
+    # Already processed
+    if idx != -1:
+        return None
 
     # Get collection from url
     collection_from_url = None
@@ -230,22 +259,22 @@ def post_feature(feature, url):
         logger.error("  Collection from url [%s] differs from collection in feature [%s] - skipping" % (collection_from_url, feature['collection']))
         return
     
-    logger.info("  POST Feature %s to %s" % (feature["id"], RESTO_URL + '/collections/' + feature["collection"] + '/items'))
+    #logger.info("  POST Feature %s to %s" % (feature["id"], RESTO_URL + '/collections/' + feature["collection"] + '/items'))
    
     resp = requests.post("%s/collections/%s/items" % (RESTO_URL, feature["collection"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
-    # Insert feature
-    if resp.status_code == 200:
-        logger.info("  Insert feature %s into collection %s" % (feature["id"], feature["collection"]))
-
     # HTTP 409 => feature exists. Retry with PUT to update
-    elif resp.status_code == 409:
-        logger.info("  Update existing feature %s" % (feature["id"]))
+    if resp.status_code == 409:
+    #    logger.info("  Update existing feature %s" % (feature["id"]))
         resp = requests.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    # Insert feature
+    #elif resp.status_code == 200:
+    #    logger.info("  Insert feature %s into collection %s" % (feature["id"], feature["collection"]))
 
     # HTTP !== 200 => error
     if resp.status_code != 200:
-        logger.error("  " + str(resp.json()))
+    #    logger.error("  " + str(resp.json()))
+        return None
 
     return resp.json()
 
@@ -421,6 +450,18 @@ if DEVEL:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     logger.debug("Setting requests verify to %s", SSL_VERIFY )
 
+# History file
+HISTORY_FILE = os.environ.get('HISTORY_FILE') if os.environ.get('HISTORY_FILE') else None
+if args and 'HISTORY_FILE' in args and args.HISTORY_FILE:
+    HISTORY_FILE = args.HISTORY_FILE
+
+LOOKUP_LIST=[]
+if HISTORY_FILE and os.path.isfile(HISTORY_FILE):
+    logger.info("Use history file %s" % HISTORY_FILE)
+    f = open(HISTORY_FILE, "r")
+    LOOKUP_LIST = [line.strip() for line in f]
+    f.close()
+
 RETRY_STRATEGY = Retry(
     total=50,
     backoff_factor=2,
@@ -448,4 +489,6 @@ session.mount(RESTO_URL.split('://')[0] + '://', adapter)
 logger.debug("------------------------------------------------------------------------------------")
 logger.debug("Process %s" % STAC_URL)
 logger.debug("------------------------------------------------------------------------------------")
-process_stuff(STAC_URL)
+lookup_table = process_stuff(STAC_URL, LOOKUP_LIST)
+store_history(lookup_table)
+
