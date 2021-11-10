@@ -230,14 +230,16 @@ def post_collection(collection):
 #
 def post_feature(feature, url, lookup_table):
 
-    try:
-        idx = lookup_table.index(url)
-    except ValueError:
-        idx = -1
-    
-    # Already processed
-    if idx != -1:
-        return None
+    # Check the lookup table only if HISTORY_FILE is set
+    if HISTORY_FILE:
+        try:
+            idx = lookup_table.index(url)
+        except ValueError:
+            idx = -1
+        
+        # Already processed
+        if idx != -1:
+            return None
 
     # Get collection from url
     collection_from_url = None
