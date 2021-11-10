@@ -48,6 +48,7 @@ USAGE = """stac2resto - Takes an input STAC catalog root url and ingest items re
         --RESTO_URL                 resto endpoint. Default is "http://host.docker.internal:5252"
         --COLLECTION_DEFAULT_MODEL  Default model to apply to new collection if not present in collection.json file (Default is "DefaultModel")
         --INGEST_STRATEGY           Ingest strategy defines what is ingested i.e. "collection", "feature", "both" or "none" (Default is "collection")
+        --USE_TQDM                  Use tqdm (should not be set if using nohup)
         --DEVEL                     Set DEVEL mode on (i.e. deactivate ssl and be verbose)
               
 """
@@ -76,6 +77,7 @@ def args_options():
     parser.add_argument('--INGEST_STRATEGY', help='Ingest strategy defines what is ingested i.e. "collection", "feature" or "both" (Default is "collection")')
     parser.add_argument('--HISTORY_FILE', help='Use an history file. All feature listed in the history file will not be processed')
     parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
+    parser.add_argument('--USE_TQDM', action='store_true', help='Use tqdm (should not be set if using nohup)')
     
     return parser
 
@@ -145,18 +147,33 @@ def process_stuff(url, lookup_table):
     # Recursively process links
     size = len(stuff["links"])
     logger.info("   Found %s links" % str(size))
-    for link in tqdm(stuff["links"]):
 
-        # Compute the absolute child url
-        child_url = get_absolute_url(url, link["href"])
+    if USE_TQDM:
+        for link in tqdm(stuff["links"]):
 
-        if link["rel"] in ["item", "items"] and INGEST_FEATURE:
-            process_stuff(child_url, lookup_table)
-        elif link["rel"] == "child":
-            logger.debug("------------------------------------------------------------------------------------")
-            logger.debug("Process %s" % child_url)
-            logger.debug("------------------------------------------------------------------------------------")
-            process_stuff(child_url, lookup_table)
+            # Compute the absolute child url
+            child_url = get_absolute_url(url, link["href"])
+
+            if link["rel"] in ["item", "items"] and INGEST_FEATURE:
+                process_stuff(child_url, lookup_table)
+            elif link["rel"] == "child":
+                logger.debug("------------------------------------------------------------------------------------")
+                logger.debug("Process %s" % child_url)
+                logger.debug("------------------------------------------------------------------------------------")
+                process_stuff(child_url, lookup_table)
+    else:
+        for link in stuff["links"]:
+
+            # Compute the absolute child url
+            child_url = get_absolute_url(url, link["href"])
+
+            if link["rel"] in ["item", "items"] and INGEST_FEATURE:
+                process_stuff(child_url, lookup_table)
+            elif link["rel"] == "child":
+                logger.debug("------------------------------------------------------------------------------------")
+                logger.debug("Process %s" % child_url)
+                logger.debug("------------------------------------------------------------------------------------")
+                process_stuff(child_url, lookup_table)
     
 #
 # Compute an absolute url
@@ -390,6 +407,11 @@ if args and 'RESTO_URL' in args and args.RESTO_URL:
 DEVEL = os.environ.get('DEVEL') if os.environ.get('DEVEL') else False
 if args and 'DEVEL' in args and args.DEVEL:
     DEVEL = True
+
+# Use TQDM
+USE_TQDM = os.environ.get('USE_TQDM') if os.environ.get('USE_TQDM') else False
+if args and 'USE_TQDM' in args and args.USE_TQDM:
+    USE_TQDM = True
 
 # Default model to apply to collection
 COLLECTION_DEFAULT_MODEL = os.environ.get('COLLECTION_DEFAULT_MODEL') if os.environ.get('COLLECTION_DEFAULT_MODEL') else 'DefaultModel'
