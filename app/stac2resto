@@ -8,10 +8,7 @@
 
 import sys
 import json
-import re
 import requests
-import urllib3
-import time
 import os
 import validators
 import signal
@@ -22,9 +19,9 @@ import textwrap
 from colorlog import ColoredFormatter
 
 from environs import Env
-from requests.adapters import HTTPAdapter
+from requests.adapters import HTTPAdapter, Retry
 from requests.auth import HTTPBasicAuth
-from urllib3.util import Retry
+from urllib.parse import urljoin
 
 from tqdm import tqdm
 
@@ -47,7 +44,11 @@ USAGE = """stac2resto - Takes an input STAC catalog root url and ingest items re
 
         --RESTO_URL                 resto endpoint. Default is "http://host.docker.internal:5252"
         --COLLECTION_DEFAULT_MODEL  Default model to apply to new collection if not present in collection.json file (Default is "DefaultModel")
-        --INGEST_STRATEGY           Ingest strategy defines what is ingested i.e. "collection", "feature", "both" or "none" (Default is "collection")
+        --INGEST_STRATEGY           Ingest strategy defines what is ingested i.e. "catalog", "feature", "both" or "none" (Default is "catalog")
+        --FORCE_UPDATE              Update collection/feature if it already exists (Default is no update)
+        --DISCARD_EXTENT            Discard input collection extents during ingestion
+        --HISTORY_FILE              Use an history file. All feature listed in the history file will not be processed.
+        --DO_NOT_SPLIT_GEOM         True to not split input geometry (Default is false)
         --USE_TQDM                  Use tqdm (should not be set if using nohup)
         --DEVEL                     Set DEVEL mode on (i.e. deactivate ssl and be verbose)
               
@@ -74,9 +75,12 @@ def args_options():
     parser.add_argument('STAC_URL', help="STAC endpoint. This could be either a local catalog endpoint (e.g./data/catalog.json) or a remote catalog endpoint (e.g. https://tamn.snapplanet.io)")
     parser.add_argument('--RESTO_URL', help='resto endpoint. Default is "http://host.docker.internal:5252"')
     parser.add_argument('--COLLECTION_DEFAULT_MODEL', help='Default model to apply to new collection if not present in collection.json file (Default is "DefaultModel")')
-    parser.add_argument('--INGEST_STRATEGY', help='Ingest strategy defines what is ingested i.e. "collection", "feature" or "both" (Default is "collection")')
+    parser.add_argument('--INGEST_STRATEGY', help='Ingest strategy defines what is ingested i.e. "catalog", "feature" or "both" (Default is "catalog")')
+    parser.add_argument('--FORCE_UPDATE', action='store_true', help='Update collection/feature if it already exists (Default is no update)')
+    parser.add_argument('--DISCARD_EXTENT', action='store_true', help='Discard input collection extents during ingestion')
     parser.add_argument('--HISTORY_FILE', help='Use an history file. All feature listed in the history file will not be processed')
     parser.add_argument('--DEVEL', action='store_true', help='Set DEVEL mode on (i.e. deactivate ssl and be verbose)')
+    parser.add_argument('--DO_NOT_SPLIT_GEOM', action='store_true', help='True to not split input geometry (Default is false)')
     parser.add_argument('--USE_TQDM', action='store_true', help='Use tqdm (should not be set if using nohup)')
     
     return parser
@@ -98,55 +102,41 @@ def process_stuff(url, lookup_table):
     if KILL_ME == True:
         sys.exit(1)
 
-    # Check between url and path for parsing
-    if validators.url(url) is True:
-        stuff = read_remote_json(url)
-    else:
-        try:
-            if os.path.exists(url) is False:
-                logger.warning("  File %s does not exist - skipping", url)
-                return    
-            f = open(url)
-            stuff = json.load(f)
-            f.close()
-        except:
-            logger.warning("  Cannot open file %s - skipping", url)
-            f.close()
-            return
+    stuff = read_path(url)
 
     # Not STAC - skip
     if stuff is None or "type" not in stuff:
-        logger.warning("  Invalid stac file %s - skipping", url)
+        logger.warning(" Invalid stac file %s - skipping", url)
         return
 
     # Post Feature and skip
     if stuff["type"] == "Feature":
-        if INGEST_FEATURE:
-            res = post_feature(stuff, url, lookup_table)
-            if res:
-                lookup_table.append(url)
-                add_to_history(url)
+        logger.info(" Found feature %s at %s" % (stuff["id"], url))
+        res = post_feature(stuff, url, lookup_table)
+        if res:
+            lookup_table.append(url)
+            add_to_history(url)
         return
 
-    # Post FeatureCollection and skip
-    if stuff["type"] == "FeatureCollection":
-        if INGEST_FEATURE:
-            post_features(stuff, url)
-        return
+    # Catalog - post collection but continue to explore links after
+    if stuff["type"] == "Catalog":
+        logger.info(" Found catalog %s at %s" % (stuff["id"], url))
+        post_catalog(stuff, url)
+            
 
     # Collection - post collection but continue to explore links after
     if stuff["type"] == "Collection":
-        if INGEST_COLLECTION:
-            post_collection(stuff)
+        logger.info(" Found collection %s at %s" % (stuff["id"], url))
+        post_collection(stuff, url)
 
     # No links skip
     if isinstance(stuff["links"], list) is False:
-        logger.warning("  No links to process - skipping")
+        logger.warning(" No links to process - skipping")
         return
     
     # Recursively process links
     size = len(stuff["links"])
-    logger.info("   Found %s links" % str(size))
+    logger.info("  Found %s links" % str(size))
 
     if USE_TQDM:
         for link in tqdm(stuff["links"]):
@@ -154,7 +144,7 @@ def process_stuff(url, lookup_table):
             # Compute the absolute child url
             child_url = get_absolute_url(url, link["href"])
 
-            if link["rel"] in ["item", "items"] and INGEST_FEATURE:
+            if link["rel"] in ["item", "items"]:
                 process_stuff(child_url, lookup_table)
             elif link["rel"] == "child":
                 logger.debug("------------------------------------------------------------------------------------")
@@ -167,7 +157,7 @@ def process_stuff(url, lookup_table):
             # Compute the absolute child url
             child_url = get_absolute_url(url, link["href"])
 
-            if link["rel"] in ["item", "items"] and INGEST_FEATURE:
+            if link["rel"] in ["item", "items"]:
                 process_stuff(child_url, lookup_table)
             elif link["rel"] == "child":
                 logger.debug("------------------------------------------------------------------------------------")
@@ -179,11 +169,11 @@ def process_stuff(url, lookup_table):
 # Compute an absolute url
 #
 def get_absolute_url(rootUrl, url):
-    if validators.url(rootUrl) is True:
-        if validators.url(url) is False:
-            return urllib3.parse.urljoin(rootUrl, url)
+    if validators.url(rootUrl) == True:
+        if validators.url(url) == True:
+            return url
         else:
-            return url   
+            return urljoin(rootUrl, url)   
     else:
         return os.path.abspath(os.path.join(os.path.dirname(rootUrl), url))  
 
@@ -192,25 +182,48 @@ def get_absolute_url(rootUrl, url):
 #
 def read_remote_json(url):
 
+    logger.info("Get file %s", url)
     try:
-        stuff = session.get(url, timeout = DEFAULT_TIMEOUT, headers=RESTO_HEADERS, verify=SSL_VERIFY).json()
-    except:
+        stuff = session.get(url, timeout = DEFAULT_TIMEOUT, verify=False).json()
+    except Exception as e:
+        print(e)
         stuff = None
     return stuff
 
+#
+# Read path
+#
+def read_path(url):
+
+    # Check between url and path for parsing
+    if validators.url(url) is True:
+        #logger.info("Input path is an url")
+        return read_remote_json(url)
+    else:
+        #logger.info("Input path is a local path")
+        try:
+            if os.path.exists(url) is False:
+                logger.warning(" File %s does not exist - skipping", url)
+                return    
+            f = open(url)
+            stuff = json.load(f)
+            f.close()
+            return stuff
+        except:
+            logger.warning(" Cannot open file %s - skipping", url)
+            f.close()
+            return None
 
 #
 # POST a single item to resto
 # Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items/0f29a83f-9808-4f39-a822-1accc6085e61
 #
-def post_collection(collection):
+def post_collection(collection, collectionUrl):
 
     tmpCollection = collection.copy()
 
     if 'model' not in tmpCollection:
         tmpCollection["model"] = COLLECTION_DEFAULT_MODEL
-    
-    logger.info("  Found collection %s" % (tmpCollection["id"]))
     
     # [IMPORTANT] Discard summaries and links
     if "summaries" in tmpCollection:
@@ -219,23 +232,73 @@ def post_collection(collection):
     if "links" in tmpCollection:
         del tmpCollection["links"]
 
+    # [IMPORTANT] Discard bbox if invalid
+    if DISCARD_EXTENT and "extent" in tmpCollection:
+        del tmpCollection["extent"]
+
+    parentId = get_parent_id(collection, collectionUrl)
+    LINEAGE.append({
+        "id": collection["id"],
+        "type":"collection",
+        "parentId":parentId
+    })
+
+    if INGEST_CATALOG is False:
+        return None
+    
     resp = requests.post("%s/collections" % (RESTO_URL), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # Create collection
     if resp.status_code == 200:
-        logger.info("  Create collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
+        logger.info(" Create collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
 
     # HTTP 409 => collection exists. Retry with PUT to update
     elif resp.status_code == 409:
-        logger.info("  Update existing collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
-        resp = requests.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        if FORCE_UPDATE:
+            logger.info(" Update existing collection %s using model %s to %s" % (tmpCollection["id"], COLLECTION_DEFAULT_MODEL, RESTO_URL + '/collections'))
+            resp = requests.put("%s/collections/%s" % (RESTO_URL, collection["id"]), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        else:
+            logger.warning(" Collection %s at %s already exists - skipping" % (tmpCollection["id"], collectionUrl))
+            return None            
 
     # HTTP !== 200 => error
     if resp.status_code != 200:
         logger.error("  " + str(resp.json()))
+        return None
 
     return resp.json()
 
+#
+# POST a new catalog
+#
+def post_catalog(catalog, catalogUrl):
+
+    if RESTO_URL is None:
+        return 
+
+    parentId = get_parent_id(catalog, catalogUrl)
+
+    # Add a line in lineage
+    LINEAGE.append({
+        "id": catalog["id"],
+        "type":"catalog",
+        "parentId":parentId
+    })
+
+    if INGEST_CATALOG is False:
+        return None
+
+    resp = requests.post("%s/catalogs" % (RESTO_URL), json=catalog, params={"pid": parentId}, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+
+    # Create collection
+    if resp.status_code == 200:
+        logger.info(" Create catalog %s with parent %s" % (catalog["id"], parentId))
+
+    # HTTP !== 200 => error
+    if resp.status_code != 200:
+        logger.error(" " + str(resp.json()))
+
+    return resp.json()
 
 #
 # POST a single item to resto
@@ -254,126 +317,84 @@ def post_feature(feature, url, lookup_table):
         if idx != -1:
             return None
 
-    # Get collection from url
-    collection_from_url = None
-    search_me = re.search(r".*/collections/(.*)/items/.*", url)
-    if search_me:
-        collection_from_url = search_me.group(1)
+    if RESTO_URL is None:
+        return None
 
-    # Assign collection to feature if not set
-    if 'collection' not in feature:
-        feature["collection"] = collection_from_url
+    # Use or not ST_SplitDateLine
+    params = {}
+    if DO_NOT_SPLIT_GEOM == True:
+        params = {'_splitGeom': 0}
     
-    # Collection is not defined neither in feature nor in url
-    if feature["collection"] is None:
-        logger.error("  Collection is not set - skipping")
-        return
-
-    # Check collection conformity
-    if collection_from_url and feature["collection"] != collection_from_url:
-        logger.error("  Collection from url [%s] differs from collection in feature [%s] - skipping" % (collection_from_url, feature['collection']))
-        return
+    # Compute catalog lineage
+    keywords = prefix_with_catalog(lineage_to_keywords(feature["collection"], []))
+    if keywords:
+        if "properties" not in feature:
+            feature["properties"] = {}
+        feature["properties"]["_keywords"] = keywords
     
-    #logger.info("  POST Feature %s to %s" % (feature["id"], RESTO_URL + '/collections/' + feature["collection"] + '/items'))
-   
-    resp = requests.post("%s/collections/%s/items" % (RESTO_URL, feature["collection"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    if INGEST_FEATURE is False:
+        return None
+    
+    resp = requests.post("%s/collections/%s/items" % (RESTO_URL, feature["collection"]), json=feature, params=params, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+    
+    if resp.status_code == 200:
+        logger.info(" Create feature %s from %s" % (feature["id"], url))
 
     # HTTP 409 => feature exists. Retry with PUT to update
     if resp.status_code == 409:
-    #    logger.info("  Update existing feature %s" % (feature["id"]))
-        resp = requests.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
-    # Insert feature
-    #elif resp.status_code == 200:
-    #    logger.info("  Insert feature %s into collection %s" % (feature["id"], feature["collection"]))
-
+        if FORCE_UPDATE:
+            logger.info(" Update existing feature %s at %s " % (feature["id"], url))
+            resp = requests.put("%s/collections/%s/items/%s" % (RESTO_URL, feature["collection"], feature["id"]), json=feature, headers=RESTO_HEADERS, verify=SSL_VERIFY)
+        else:
+            logger.warning(" Feature %s at %s already exists - skipping" % (feature["id"], url))
+            return None
+        
     # HTTP !== 200 => error
     if resp.status_code != 200:
-    #    logger.error("  " + str(resp.json()))
+        logger.error((" Cannot create feature %s : " + str(resp.json())) % (url))
         return None
 
     return resp.json()
 
 #
-# POST a FeatureCollection to resto
-# Example of url: https://explorer.dea.ga.gov.au/collections/s2a_ard_granule/items
-# 
-def post_features(features, url, max_features=20):
-
-    logger.info("  POST Features")
-    return
-
-    post_features.next_item_url = url
-    # From api https://resto/api.html#resto-feature
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'dea-access-resto-ingester/v1'
-    }
-    collection_id = re.search(r".*/collections/(.*)/items$", url).group(1)
-    resto_items_url = "%s/collections/%s/items" % (RESTO_URL, collection_id)
-
-    processed = 0
-    while True:
-        start_time = time.time()
-        logging.info("Retrieve FeatureCollection from: %s" % (post_features.next_item_url))
-        try:
-            feature_col = session.get(post_features.next_item_url, timeout = DEFAULT_TIMEOUT, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD)).json()
-            numfeat     = int(feature_col["context"]["returned"])
-            logging.info("Retrieved %s features" % (numfeat))
-        except requests.ConnectionError as e:
-            if re.search('Max retries', str(e), re.IGNORECASE):
-                logging.error("Read timed out. Max retries exceeded with url: %s" % e.request.url)
-            else:
-                logging.error("ConnectionError for URL %s: %s" % (e.request.url, e))
-            break
-        except requests.RequestException as e:
-            logging.error("RequestException for URL %s: %s" % (e.request.url, e))
-            break
-        else:
-            try:
-
-                count = 0
-                # POST feature one by one to avoid memory issue with very large FeatureCollection
-                for feature in tqdm(feature_col["features"]):
-                    try:
-                        resp = session.post("%s/collections/%s/items" % (RESTO_URL, collection_id), json=feature, headers=headers, verify=SSL_VERIFY, auth=HTTPBasicAuth(API_USER, API_PASSWORD))
-                        resp.raise_for_status()
-                        logging.debug(resp.json())
-                    except requests.HTTPError as e:
-                        if re.search('409 Client Error', str(e), re.IGNORECASE):
-                            pass
-                        else:
-                            logging.error("%s" % str(e))
-                            raise SystemExit(1)
-                    finally:
-                        processed = processed + 1
-                        count = count + 1
-                        if max_features != -1 and processed >= max_features:
-                            break
-            except:
-                logging.error("POST feature failed")
+# Return parent id
+#
+def get_parent_id(catalog, catalogUrl):
+    parentId = None
+    # First get parent if any
+    if isinstance(catalog["links"], list) is True:
+        for link in catalog["links"]:
+            if "rel" in link and link["rel"] == "parent":
+                parent = read_path(get_absolute_url(catalogUrl, link["href"]))
+                if parent:
+                    parentId = parent["id"]
                 break
-            else:
-                end_time = time.time() - start_time
-                numsec = numfeat/end_time
-                logging.info("%s features posted to resto (collection: %s) at %s item/s" % (str(count), collection_id, numsec))
+    return parentId
 
-                # Stop on page_limit reached
-                if max_features != -1 and processed >= max_features:
-                    logging.info("Maximum number of features (%s) reached for collection %s" % (str(processed), collection_id))
-                    break
+def lineage_to_keywords(id, keywords):
+    for obj in LINEAGE:
+        if obj["id"] == id:
+            if obj["type"] == "catalog":
+                keywords.append({
+                    "id": id,
+                    "name": id,
+                    "parentId": obj["parentId"],
+                    "type": "catalog"
+                })
+            if obj["parentId"]:
+                return lineage_to_keywords(obj["parentId"], keywords)
+    return keywords
 
-                # Search next link if any, or end posting feature
-                post_features.next_item_url = None
-                for link in feature_col["links"]:
-                    if link["rel"] == "next":
-                        post_features.next_item_url = link["href"]
-                        break
-
-                if post_features.next_item_url is None:
-                    logging.info("No more items for collection %s" % (collection_id))
-                    break
-
+def prefix_with_catalog(keywords):
+    _keywords = []
+    for keyword in keywords:
+        _keywords.append({
+            "id": "catalog:" + keyword["id"],
+            "parentId": "catalog:" + keyword["parentId"] if keyword["parentId"] else None,
+            "name": keyword["id"],
+            "type": "catalog"
+        })
+    return _keywords
 
 # ############ end functions ##############################################
 
@@ -381,6 +402,7 @@ def post_features(features, url, max_features=20):
 KILL_ME = False
 DEFAULT_TIMEOUT = 45 # seconds
 SSL_VERIFY      = True
+LINEAGE = []
 
 # CTRL-C handler
 signal.signal(signal.SIGINT, kill_handler)
@@ -403,12 +425,22 @@ RESTO_URL = os.environ.get('RESTO_URL') if os.environ.get('RESTO_URL') else 'htt
 if args and 'RESTO_URL' in args and args.RESTO_URL:
     RESTO_URL = args.RESTO_URL
 
-# Devel
 DEVEL = os.environ.get('DEVEL') if os.environ.get('DEVEL') else False
 if args and 'DEVEL' in args and args.DEVEL:
     DEVEL = True
 
-# Use TQDM
+FORCE_UPDATE = os.environ.get('FORCE_UPDATE') if os.environ.get('FORCE_UPDATE') else False
+if args and 'FORCE_UPDATE' in args and args.FORCE_UPDATE:
+    FORCE_UPDATE = True
+
+DISCARD_EXTENT = os.environ.get('DISCARD_EXTENT') if os.environ.get('DISCARD_EXTENT') else False
+if args and 'DISCARD_EXTENT' in args and args.DISCARD_EXTENT:
+    DISCARD_EXTENT = True
+
+DO_NOT_SPLIT_GEOM = os.environ.get('DO_NOT_SPLIT_GEOM') if os.environ.get('DO_NOT_SPLIT_GEOM') else False
+if args and 'DO_NOT_SPLIT_GEOM' in args and args.DO_NOT_SPLIT_GEOM:
+    DO_NOT_SPLIT_GEOM = True
+
 USE_TQDM = os.environ.get('USE_TQDM') if os.environ.get('USE_TQDM') else False
 if args and 'USE_TQDM' in args and args.USE_TQDM:
     USE_TQDM = True
@@ -421,8 +453,6 @@ if args and 'COLLECTION_DEFAULT_MODEL' in args and args.COLLECTION_DEFAULT_MODEL
 # Color logging
 LOG_LEVEL = logging.DEBUG if DEVEL == True else logging.INFO 
 LOGFORMAT = "%(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
-#LOGFORMAT = "[%(log_color)s%(levelname)s%(reset)s] %(log_color)s%(message)s%(reset)s"
-#LOGFORMAT = "%(asctime)s - %(name)s - [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
 logging.root.setLevel(LOG_LEVEL)
 formatter = ColoredFormatter(LOGFORMAT)
 stream = logging.StreamHandler()
@@ -433,41 +463,30 @@ logger.setLevel(LOG_LEVEL)
 logger.addHandler(stream)
 
 # Ingest collection, feature or both
-INGEST_STRATEGY = os.environ.get('INGEST_STRATEGY') if os.environ.get('INGEST_STRATEGY') else 'collection'
+INGEST_STRATEGY = os.environ.get('INGEST_STRATEGY') if os.environ.get('INGEST_STRATEGY') else 'catalog'
 if args and 'INGEST_STRATEGY' in args and args.INGEST_STRATEGY:
     INGEST_STRATEGY = args.INGEST_STRATEGY
 
-if INGEST_STRATEGY == 'collection':
-    INGEST_COLLECTION = True
+if INGEST_STRATEGY == 'catalog':
+    INGEST_CATALOG = True
     INGEST_FEATURE = False
 elif INGEST_STRATEGY == 'feature':
     INGEST_FEATURE = True
-    INGEST_COLLECTION = False
+    INGEST_CATALOG = False
 elif INGEST_STRATEGY == 'both':
-    INGEST_COLLECTION = True
+    INGEST_CATALOG = True
     INGEST_FEATURE = True
 elif INGEST_STRATEGY == 'none':
     INGEST_FEATURE = False
-    INGEST_COLLECTION = False
+    INGEST_CATALOG = False
 else:
-    usage("Unknown INGEST_STRATEGY - should be one of \"collection\", \"feature\", \"both\" or \"none\"")
-
-# Snapplanet_auth_token is mandatory
-RESTO_ADMIN_AUTH_TOKEN = os.environ.get("RESTO_ADMIN_AUTH_TOKEN")
-if args and 'authToken' in args and args.authToken:
-    RESTO_ADMIN_AUTH_TOKEN = args.authToken
-
-if RESTO_ADMIN_AUTH_TOKEN is None:
-    usage("Missing mandatory environement variable RESTO_ADMIN_AUTH_TOKEN")
-
-if RESTO_URL is None:
-    usage("Missing mandatory target RESTO_URL")
+    usage("Unknown INGEST_STRATEGY - should be one of \"catalog\", \"feature\", \"both\" or \"none\"")
 
 if DEVEL:
     SSL_VERIFY=False
     logger.debug("Devel set to %s" % DEVEL)
     logger.debug("Disable warnings for insecure ssl request in urllib3")
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
     logger.debug("Setting requests verify to %s", SSL_VERIFY )
 
 # History file
@@ -482,32 +501,43 @@ if HISTORY_FILE and os.path.isfile(HISTORY_FILE):
     LOOKUP_LIST = [line.strip() for line in f]
     f.close()
 
-RETRY_STRATEGY = Retry(
-    total=50,
-    backoff_factor=2,
-    status_forcelist=[ 429, 500, 502, 503, 504 ], # Retry on these error codes. Might have to add more in future. depends on explorer API errors.
-    method_whitelist=[ "HEAD", "GET", "POST" ]
-)
-
-RESTO_HEADERS = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'User-Agent': 'stac2resto',
-    'Authorization': 'Bearer ' + RESTO_ADMIN_AUTH_TOKEN
-}
-
 # post items to resto according to item type: item, items, collection, etc.
 logger.debug("Input STAC endpoint is %s " % (STAC_URL))
-logger.debug("Target resto endpoint is %s " % RESTO_URL)
-logger.debug("RESTO_ADMIN_AUTH_TOKEN is set to %s " % RESTO_ADMIN_AUTH_TOKEN)
 
-session = requests.Session()
-adapter = HTTPAdapter(max_retries=RETRY_STRATEGY)
-session.mount(RESTO_URL.split('://')[0] + '://', adapter)
+# resto admin auth token is required for POST
+RESTO_ADMIN_AUTH_TOKEN = os.environ.get("RESTO_ADMIN_AUTH_TOKEN")
+if args and 'authToken' in args and args.authToken:
+    RESTO_ADMIN_AUTH_TOKEN = args.authToken
+
+if RESTO_ADMIN_AUTH_TOKEN is None:
+    logger.warning("RESTO_ADMIN_AUTH_TOKEN env variable is not set")
+    RESTO_HEADERS = {}
+else:
+    logger.debug("RESTO_ADMIN_AUTH_TOKEN is set to %s " % RESTO_ADMIN_AUTH_TOKEN)
+    RESTO_HEADERS = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'stac2resto',
+        'Authorization': 'Bearer ' + RESTO_ADMIN_AUTH_TOKEN
+    }
+
+if RESTO_URL is None:
+    logger.warning("RESTO_URL is not set - no POST to resto will be made")
+else:
+    logger.debug("Target resto endpoint is %s " % RESTO_URL)
+    RETRY_STRATEGY = Retry(
+        total=50,
+        backoff_factor=2,
+        status_forcelist=[ 429, 500, 502, 503, 504 ], # Retry on these error codes. Might have to add more in future. depends on explorer API errors.
+        allowed_methods=[ "HEAD", "GET", "POST" ]
+    )
+    session = requests.Session()
+    adapter = HTTPAdapter(max_retries=RETRY_STRATEGY)
+    session.mount(RESTO_URL.split('://')[0] + '://', adapter)
+
 
 # Iterative process
 logger.debug("------------------------------------------------------------------------------------")
 logger.debug("Process %s" % STAC_URL)
 logger.debug("------------------------------------------------------------------------------------")
 process_stuff(STAC_URL, LOOKUP_LIST)
-
