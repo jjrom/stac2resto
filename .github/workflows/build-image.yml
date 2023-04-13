@@ -1,0 +1,57 @@
+name: stac2resto image builder
+
+env:
+  IMAGE: stac2resto
+  NAME: jjrom
+  REPO: stac2resto
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  release:
+    types: [created, edited]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # defaults to shallow checkout
+    - uses: actions/checkout@v2
+
+    - name: Print values of all environment variables
+      run: printenv
+    
+    - name: Login to DockerHub Registry
+      run: echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+    
+    - name: Build the tagged Docker image
+      run: docker build --file ./Dockerfile --tag ${NAME}/${IMAGE}:latest
+      
+    - name: Unshallow repository
+      run: git fetch --prune --unshallow 2> /dev/null || true
+
+    - name: Tag main branch and push to repository
+      if: ${{ startsWith(github.ref, 'refs/heads/main') }}
+      run: |
+        
+        # Push image
+        docker push ${NAME}/${IMAGE}
+    
+    - name: Tag latest release and push to repository
+      if: ${{ github.event_name == 'release' }}
+      run: |
+        
+        # Get latest release tag
+        tag=$(git describe --tags --abbrev=0 | sed s/^v//)
+        
+        # Tag image
+        docker tag ${NAME}/${IMAGE}:latest ${NAME}/${IMAGE}:${tag}
+
+        # Push release
+        docker push ${NAME}/${IMAGE}:${tag}
+    
+      

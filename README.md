@@ -3,7 +3,7 @@ Ingest a STAC tree into resto database
 
 ## Build application
 
-    docker build -t jjrom/stac2resto:latest -f Dockerfile.stac2resto .
+    docker build -t jjrom/stac2resto:latest .
 
 ## Run application
 

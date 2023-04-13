@@ -3,7 +3,7 @@
 #
 # Build the container with latest from image `--pull` flag
 #
-#   docker build --pull -t jjrom/stac2resto -f ./Dockerfile.stac2resto .
+#   docker build --pull -t jjrom/stac2resto -f ./Dockerfile .
 #
 # Run ingest of 10 items for collection high_tide_comp_20p locally without ssl
 #
