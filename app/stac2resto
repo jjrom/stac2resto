@@ -393,13 +393,13 @@ def get_parent_id(catalog, catalogUrl):
 def lineage_to_keywords(id, keywords):
     for obj in LINEAGE:
         if obj["id"] == id:
-            if obj["type"] == "catalog":
-                keywords.append({
-                    "id": id,
-                    "name": id,
-                    "parentId": obj["parentId"],
-                    "type": "catalog"
-                })
+            keywords.append({
+                "id": id,
+                "name": id,
+                "parentId": obj["parentId"],
+                # Force catalog type even if input is collection to keep lineage between collection and its parent catalog
+                "type": "catalog"
+            })
             if obj["parentId"]:
                 return lineage_to_keywords(obj["parentId"], keywords)
     return keywords
