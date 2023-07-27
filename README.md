@@ -8,7 +8,7 @@ Ingest a STAC tree into resto database
 ## Run application
 
     STAC_DIR=$(pwd)/example
-    RESTO_URL=http://localhost:5252
+    RESTO_URL=http://host.docker.internal:5252
     docker run -v ${STAC_DIR}:/data -it --rm \
         -e RESTO_URL=${RESTO_URL} \
         -e FORCE_UPDATE=true \
