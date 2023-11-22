@@ -262,6 +262,12 @@ def post_collection(collection, collectionUrl):
     if INGEST_CATALOG is False:
         return None
     
+    logger.debug('======== POST COLLECTION =========')
+    logger.debug(RESTO_URL)
+    logger.debug(json.dumps(tmpCollection))
+    logger.debug(json.dumps(RESTO_HEADERS))
+    logger.debug('==================================')
+
     resp = requests.post("%s/collections" % (RESTO_URL), json=tmpCollection, headers=RESTO_HEADERS, verify=SSL_VERIFY)
 
     # Create collection
@@ -354,6 +360,12 @@ def post_feature(feature, url, lookup_table):
     if INGEST_FEATURE is False:
         return None
     
+    logger.debug('======== POST FEATURE =========')
+    logger.debug(RESTO_URL)
+    logger.debug(json.dumps(feature))
+    logger.debug(json.dumps(RESTO_HEADERS))
+    logger.debug('==================================')
+
     resp = requests.post("%s/collections/%s/items" % (RESTO_URL, feature["collection"]), json=feature, params=params, headers=RESTO_HEADERS, verify=SSL_VERIFY)
     
     if resp.status_code == 200:
@@ -444,7 +456,7 @@ RESTO_URL = os.environ.get('RESTO_URL') if os.environ.get('RESTO_URL') else 'htt
 if args and 'RESTO_URL' in args and args.RESTO_URL:
     RESTO_URL = args.RESTO_URL
 
-DEVEL = os.environ.get('DEVEL') if os.environ.get('DEVEL') else False
+DEVEL = True if os.environ.get('DEVEL') else False
 if args and 'DEVEL' in args and args.DEVEL:
     DEVEL = True
 
